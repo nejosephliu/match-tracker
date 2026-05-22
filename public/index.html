@@ -178,12 +178,15 @@
   /* ── ALL losers grid ── */
   .losers-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
   .loser-row {
-    display: flex; align-items: center; gap: 12px;
+    display: grid;
+    grid-template-columns: minmax(4.5rem, max-content) 1fr 3.75rem;
+    align-items: center;
+    column-gap: 10px;
     background: var(--card2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 11px 14px;
+    border-radius: 9px; padding: 10px 12px;
   }
-  .loser-row .lr-name   { flex: 1; font-weight: 600; }
-  .loser-row .lr-tai    { display: flex; align-items: center; gap: 8px; }
+  .loser-row .lr-name   { font-weight: 600; white-space: nowrap; }
+  .loser-row .lr-tai    { display: flex; align-items: center; gap: 8px; justify-self: stretch; }
   .loser-row .lr-label  { font-size: 0.78rem; color: var(--text2); white-space: nowrap; }
   .loser-row input[type=number] {
     width: 68px; background: var(--bg); border: 1px solid var(--border);
@@ -191,7 +194,7 @@
     font-size: 0.9rem; outline: none; text-align: center;
   }
   .loser-row input[type=number]:focus { border-color: var(--accent); }
-  .lr-pts { font-size: 0.8rem; color: var(--negative); white-space: nowrap; min-width: 55px; text-align: right; }
+  .lr-pts { font-size: 0.8rem; color: var(--negative); white-space: nowrap; text-align: right; justify-self: end; }
 
   .all-total-line { font-size: 0.85rem; color: var(--accent2); margin-bottom: 14px; font-weight: 600; }
 
@@ -230,8 +233,14 @@
   }
   .one-tai-row { margin-bottom: 14px; }
   .one-tai-row .form-group input[type=number] { max-width: 72px; }
-  .loser-row .lr-tai-pick { flex: 1; min-width: 0; }
-  .loser-row .lr-tai-pick .tai-pick-row { justify-content: flex-end; }
+  .loser-row .lr-tai-pick {
+    display: flex; justify-content: flex-end; align-items: center;
+    min-width: 0;
+  }
+  .loser-row .lr-tai-pick .tai-pick-row {
+    justify-content: flex-end; gap: 4px; flex-wrap: wrap;
+  }
+  .loser-row .lr-tai-type { justify-self: end; }
   .loser-row .lr-tai-type { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .loser-row .lr-tai-type input[type=number] {
     width: 68px; background: var(--bg); border: 1px solid var(--border);
@@ -310,6 +319,31 @@
   .view { display: none; }
   .view.active { display: block; }
 
+  @media (max-width: 640px) {
+    .loser-row {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      row-gap: 8px;
+      align-items: center;
+    }
+    .loser-row .lr-name { grid-column: 1; grid-row: 1; }
+    .loser-row .lr-pts  { grid-column: 2; grid-row: 1; }
+    .loser-row .lr-tai-pick,
+    .loser-row .lr-tai-type {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      justify-self: stretch;
+    }
+    .loser-row .lr-tai-pick .tai-pick-row {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+  }
+
+  @media (min-width: 720px) {
+    .loser-row .lr-tai-pick .tai-pick-row { flex-wrap: nowrap; }
+  }
+
   @media (max-width: 580px) {
     .scoreboard { grid-template-columns: repeat(2, 1fr); }
   }
@@ -382,7 +416,7 @@
               <button type="button" class="tai-mode-opt active" id="one-tai-pick-btn" onclick="setTaiInputMode('pick')">Pick</button>
             </div>
             <div class="form-group" id="one-tai-type-wrap" style="max-width:72px;margin:0;display:none">
-              <input type="number" id="one-tai" value="0" min="0" max="20" oninput="onOneTaiTyped()">
+              <input type="number" id="one-tai" value="0" min="0" max="16" oninput="onOneTaiTyped()">
             </div>
           </div>
           <div class="tai-pick-row" id="one-tai-pick-wrap"></div>
@@ -448,7 +482,7 @@ let allWinner     = null;
 let oneTaiPick    = 0;
 let allTaiPicks   = [0, 0, 0];
 
-const TAI_PICK_MAX = 20;
+const TAI_PICK_MAX = 16;
 
 function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -715,7 +749,7 @@ function refreshAllForm() {
     const taiTypeHtml = pickMode ? '' : `
       <div class="lr-tai lr-tai-type">
         <span class="lr-label">TAI:</span>
-        <input type="number" id="all-tai-${i}" data-idx="${i}" value="${taiVal}" min="0" max="20"
+        <input type="number" id="all-tai-${i}" data-idx="${i}" value="${taiVal}" min="0" max="16"
           oninput="refreshAllPreview()">
       </div>`;
     const taiPickHtml = pickMode ? `
