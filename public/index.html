@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Match Tracker</title>
+<style>
+  :root {
+    --bg:        #0c0e17;
+    --card:      #13162a;
+    --card2:     #1b1f35;
+    --border:    #252a45;
+    --accent:    #7c6dfa;
+    --accent2:   #00d4aa;
+    --positive:  #2ecc71;
+    --negative:  #e74c3c;
+    --text:      #e4e6f0;
+    --text2:     #7a809e;
+    --radius:    12px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-title { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+  .header-right  { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+  /* ── Layout ── */
+  .main { max-width: 920px; margin: 0 auto; padding: 24px 16px; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px; border-radius: 8px; border: none;
+    cursor: pointer; font-size: 0.875rem; font-weight: 600;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary  { background: var(--accent);  color: #fff; }
+  .btn-primary:hover  { background: #6a5de0; }
+  .btn-success  { background: var(--accent2); color: #0c0e17; }
+  .btn-success:hover  { background: #00bfa0; }
+  .btn-danger   { background: var(--negative); color: #fff; }
+  .btn-danger:hover   { background: #c0392b; }
+  .btn-ghost    { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover    { background: var(--card2); color: var(--text); }
+  .btn-back     { background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 0.875rem; font-weight: 600; padding: 6px 10px; border-radius: 6px; }
+  .btn-back:hover     { background: rgba(124,109,250,0.1); }
+  .btn-sm { padding: 6px 13px; font-size: 0.8rem; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 18px;
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text2);
+  }
+
+  /* ── Match List ── */
+  .match-list { display: flex; flex-direction: column; gap: 10px; }
+  .match-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 15px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .match-item:hover { border-color: var(--accent); background: var(--card2); }
+  .match-item .mi-players { font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .match-item .mi-meta    { font-size: 0.8rem; color: var(--text2); }
+  .badge {
+    font-size: 0.72rem; font-weight: 700;
+    padding: 3px 10px; border-radius: 100px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .badge-active  { background: rgba(0,212,170,0.12); color: var(--accent2); }
+  .badge-ended   { background: rgba(122,128,158,0.12); color: var(--text2); }
+  .badge-one     { background: rgba(124,109,250,0.18); color: var(--accent); }
+  .badge-all     { background: rgba(0,212,170,0.18); color: var(--accent2); }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 56px 20px; color: var(--text2); }
+  .empty-icon { font-size: 2.5rem; margin-bottom: 14px; }
+  .empty h3   { color: var(--text); font-size: 1.1rem; margin-bottom: 6px; }
+  .empty p    { margin-bottom: 20px; font-size: 0.9rem; }
+
+  /* ── Scoreboard ── */
+  .scoreboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .score-card {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+  .score-card.is-leader { border-color: var(--accent2); }
+  .score-card .sc-name {
+    font-size: 0.78rem; color: var(--text2); font-weight: 600;
+    margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .score-card .sc-value { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+  .col-pos { color: var(--positive); }
+  .col-neg { color: var(--negative); }
+  .col-neu { color: var(--text2); }
+
+  /* ── Round Type Toggle ── */
+  .type-toggle { display: flex; gap: 8px; margin-bottom: 18px; }
+  .type-opt {
+    flex: 1; padding: 10px 8px; border-radius: 8px;
+    border: 2px solid var(--border);
+    background: transparent; color: var(--text2);
+    cursor: pointer; font-size: 0.875rem; font-weight: 600;
+    text-align: center; transition: all 0.15s; line-height: 1.3;
+  }
+  .type-opt small { display: block; font-weight: 400; font-size: 0.73rem; margin-top: 2px; }
+  .type-opt.active {
+    border-color: var(--accent); background: rgba(124,109,250,0.1); color: var(--accent);
+  }
+
+  /* ── Form ── */
+  .form-row  { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+  .form-group { flex: 1; min-width: 110px; }
+  .form-group label {
+    display: block; font-size: 0.73rem; font-weight: 700;
+    color: var(--text2); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .form-group select,
+  .form-group input[type=text],
+  .form-group input[type=number] {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 9px 12px;
+    font-size: 0.9rem; outline: none; transition: border-color 0.15s;
+    appearance: none;
+  }
+  .form-group select:focus,
+  .form-group input:focus { border-color: var(--accent); }
+  .form-group select option { background: var(--card2); }
+
+  .preview-line {
+    font-size: 0.82rem; color: var(--text2);
+    background: var(--card2); border-radius: 7px; padding: 8px 12px;
+    margin-bottom: 14px; min-height: 34px;
+  }
+
+  /* ── ALL losers grid ── */
+  .losers-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .loser-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 11px 14px;
+  }
+  .loser-row .lr-name   { flex: 1; font-weight: 600; }
+  .loser-row .lr-tai    { display: flex; align-items: center; gap: 8px; }
+  .loser-row .lr-label  { font-size: 0.78rem; color: var(--text2); white-space: nowrap; }
+  .loser-row input[type=number] {
+    width: 68px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 6px 10px;
+    font-size: 0.9rem; outline: none; text-align: center;
+  }
+  .loser-row input[type=number]:focus { border-color: var(--accent); }
+  .lr-pts { font-size: 0.8rem; color: var(--negative); white-space: nowrap; min-width: 55px; text-align: right; }
+
+  .all-total-line { font-size: 0.85rem; color: var(--accent2); margin-bottom: 14px; font-weight: 600; }
+
+  /* ── TAI input mode ── */
+  .tai-mode-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .tai-mode-bar .tai-mode-label {
+    font-size: 0.73rem; font-weight: 700; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .tai-mode-toggle { display: flex; gap: 4px; }
+  .tai-mode-opt {
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--text2); cursor: pointer;
+    font-size: 0.78rem; font-weight: 600; transition: all 0.15s;
+  }
+  .tai-mode-opt.active {
+    border-color: var(--accent); background: rgba(124,109,250,0.12); color: var(--accent);
+  }
+  .tai-pick-row {
+    display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .tai-btn {
+    width: 32px; height: 32px; padding: 0;
+    border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text2);
+    cursor: pointer; font-size: 0.78rem; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.12s; flex-shrink: 0;
+  }
+  .tai-btn:hover { border-color: var(--accent); color: var(--text); }
+  .tai-btn.active {
+    border-color: var(--accent); background: var(--accent); color: #fff;
+  }
+  .one-tai-row { margin-bottom: 14px; }
+  .one-tai-row .form-group input[type=number] { max-width: 72px; }
+  .loser-row .lr-tai-pick { flex: 1; min-width: 0; }
+  .loser-row .lr-tai-pick .tai-pick-row { justify-content: flex-end; }
+  .loser-row .lr-tai-type { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .loser-row .lr-tai-type input[type=number] {
+    width: 68px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 6px 10px;
+    font-size: 0.9rem; outline: none; text-align: center;
+  }
+  .loser-row .lr-tai-type input[type=number]:focus { border-color: var(--accent); }
+
+  /* ── Player pick buttons ── */
+  .player-pick-block { margin-bottom: 14px; }
+  .player-pick-block .player-pick-label {
+    font-size: 0.73rem; font-weight: 700; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .player-pick-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .player-btn {
+    padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text2);
+    cursor: pointer; font-size: 0.875rem; font-weight: 600;
+    transition: all 0.12s; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .player-btn:hover { color: var(--text); }
+  .player-btn-winner:hover { border-color: var(--positive); }
+  .player-btn-winner.active {
+    border-color: var(--positive); background: rgba(46,204,113,0.15); color: var(--positive);
+  }
+  .player-btn-loser:hover { border-color: var(--negative); }
+  .player-btn-loser.active {
+    border-color: var(--negative); background: rgba(231,76,60,0.15); color: var(--negative);
+  }
+
+  /* ── History ── */
+  .history-section { margin-top: 6px; }
+  .history-section h3 {
+    font-size: 0.72rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text2); margin-bottom: 10px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  th {
+    padding: 7px 11px; color: var(--text2); font-size: 0.72rem;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border); text-align: left;
+  }
+  td { padding: 8px 11px; border-bottom: 1px solid rgba(37,42,69,0.6); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.015); }
+  .td-pos  { color: var(--positive); font-weight: 600; }
+  .td-neg  { color: var(--negative); font-weight: 600; }
+  .td-mute { color: var(--text2); }
+  .delta   { font-size: 0.72rem; margin-left: 3px; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50; padding: 16px;
+  }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px 26px;
+    width: 100%; max-width: 400px;
+    box-shadow: 0 24px 72px rgba(0,0,0,0.6);
+  }
+  .modal h2    { font-size: 1.15rem; font-weight: 700; margin-bottom: 20px; }
+  .modal .form-group { margin-bottom: 13px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+  /* ── View switching ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  @media (max-width: 580px) {
+    .scoreboard { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     HOME VIEW
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="view-home" class="view active">
+  <div class="header">
+    <span class="header-title">🎯 Match Tracker</span>
+    <div class="header-right">
+      <button class="btn btn-primary" onclick="openNewMatchModal()">+ New Match</button>
+    </div>
+  </div>
+  <div class="main">
+    <div id="home-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MATCH VIEW
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="view-match" class="view">
+  <div class="header">
+    <button class="btn-back" onclick="goHome()">← Back</button>
+    <span class="header-title" id="match-heading">Match</span>
+    <div class="header-right" id="match-actions"></div>
+  </div>
+  <div class="main">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Scores</span>
+        <span id="match-date-badge" style="font-size:0.78rem;color:var(--text2)"></span>
+      </div>
+      <div class="scoreboard" id="scoreboard"></div>
+    </div>
+
+    <div class="card" id="add-round-card">
+      <div class="card-header">
+        <span class="card-title" id="add-round-title">Add Round</span>
+      </div>
+
+      <div class="type-toggle">
+        <div class="type-opt active" id="type-one-btn" onclick="setType('ONE')">
+          ONE <small>1 winner · 1 loser</small>
+        </div>
+        <div class="type-opt" id="type-all-btn" onclick="setType('ALL')">
+          ALL <small>1 winner · 3 losers</small>
+        </div>
+      </div>
+
+      <!-- ONE form -->
+      <div id="form-one">
+        <div class="player-pick-block">
+          <div class="player-pick-label">Winner</div>
+          <div class="player-pick-row" id="one-winner-btns"></div>
+        </div>
+        <div class="player-pick-block">
+          <div class="player-pick-label">Loser</div>
+          <div class="player-pick-row" id="one-loser-btns"></div>
+        </div>
+        <div class="one-tai-row">
+          <div class="tai-mode-bar">
+            <span class="tai-mode-label">TAI (x)</span>
+            <div class="tai-mode-toggle">
+              <button type="button" class="tai-mode-opt" id="one-tai-type-btn" onclick="setTaiInputMode('type')">Type</button>
+              <button type="button" class="tai-mode-opt active" id="one-tai-pick-btn" onclick="setTaiInputMode('pick')">Pick</button>
+            </div>
+            <div class="form-group" id="one-tai-type-wrap" style="max-width:72px;margin:0;display:none">
+              <input type="number" id="one-tai" value="0" min="0" max="20" oninput="onOneTaiTyped()">
+            </div>
+          </div>
+          <div class="tai-pick-row" id="one-tai-pick-wrap"></div>
+        </div>
+        <div class="preview-line" id="one-preview"></div>
+      </div>
+
+      <!-- ALL form -->
+      <div id="form-all" style="display:none">
+        <div class="player-pick-block">
+          <div class="player-pick-label">Winner</div>
+          <div class="player-pick-row" id="all-winner-btns"></div>
+        </div>
+        <div class="tai-mode-bar" style="margin-bottom:12px">
+          <span class="tai-mode-label">TAI input</span>
+          <div class="tai-mode-toggle">
+            <button type="button" class="tai-mode-opt" id="all-tai-type-btn" onclick="setTaiInputMode('type')">Type</button>
+            <button type="button" class="tai-mode-opt active" id="all-tai-pick-btn" onclick="setTaiInputMode('pick')">Pick</button>
+          </div>
+        </div>
+        <div class="losers-grid" id="all-losers-grid"></div>
+        <div class="all-total-line" id="all-total"></div>
+      </div>
+
+      <button class="btn btn-success" onclick="submitRound()">＋ Add Round</button>
+    </div>
+
+    <div class="card" id="history-card">
+      <div class="card-header"><span class="card-title">History</span></div>
+      <div id="history-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     NEW MATCH MODAL
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="new-match-modal" style="display:none" onclick="handleModalClick(event)">
+  <div class="modal">
+    <h2>🎮 New Match</h2>
+    <div class="form-group"><label>Player 1</label><input type="text" id="nm-p1" placeholder="Name"></div>
+    <div class="form-group"><label>Player 2</label><input type="text" id="nm-p2" placeholder="Name"></div>
+    <div class="form-group"><label>Player 3</label><input type="text" id="nm-p3" placeholder="Name"></div>
+    <div class="form-group"><label>Player 4</label><input type="text" id="nm-p4" placeholder="Name"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="flex:1" onclick="createMatch()">Start Match</button>
+      <button class="btn btn-ghost" onclick="closeNewMatchModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────────
+let matchId       = null;
+let matchData     = null;
+let roundType     = 'ONE';
+let taiInputMode  = 'pick';
+let oneWinner     = null;
+let oneLoser      = null;
+let allWinner     = null;
+let oneTaiPick    = 0;
+let allTaiPicks   = [0, 0, 0];
+
+const TAI_PICK_MAX = 20;
+
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function playerButtonsHtml(players, selected, handler, role) {
+  const cls = role === 'winner' ? 'player-btn player-btn-winner' : 'player-btn player-btn-loser';
+  return players.map(p => {
+    const active = p === selected ? ' active' : '';
+    // Single-quoted onclick — JSON.stringify uses double quotes and would break a double-quoted attribute
+    return `<button type="button" class="${cls}${active}" onclick='${handler}(${JSON.stringify(p)})'>${escHtml(p)}</button>`;
+  }).join('');
+}
+
+function selectOneWinner(p) {
+  oneWinner = p;
+  const losers = matchData.players.filter(x => x !== p);
+  if (!losers.includes(oneLoser)) oneLoser = losers[0];
+  renderOnePlayerPicks();
+  refreshOnePreview();
+}
+
+function selectOneLoser(p) {
+  oneLoser = p;
+  renderOnePlayerPicks();
+  refreshOnePreview();
+}
+
+function selectAllWinner(p) {
+  allWinner = p;
+  renderAllWinnerPick();
+  refreshAllForm();
+}
+
+function renderOnePlayerPicks() {
+  if (!matchData) return;
+  document.getElementById('one-winner-btns').innerHTML =
+    playerButtonsHtml(matchData.players, oneWinner, 'selectOneWinner', 'winner');
+  const losers = matchData.players.filter(p => p !== oneWinner);
+  document.getElementById('one-loser-btns').innerHTML =
+    playerButtonsHtml(losers, oneLoser, 'selectOneLoser', 'loser');
+}
+
+function renderAllWinnerPick() {
+  if (!matchData) return;
+  document.getElementById('all-winner-btns').innerHTML =
+    playerButtonsHtml(matchData.players, allWinner, 'selectAllWinner', 'winner');
+}
+
+function applyTaiInputModeUI() {
+  const mode = taiInputMode;
+  ['one', 'all'].forEach(prefix => {
+    document.getElementById(`${prefix}-tai-type-btn`)?.classList.toggle('active', mode === 'type');
+    document.getElementById(`${prefix}-tai-pick-btn`)?.classList.toggle('active', mode === 'pick');
+  });
+  document.getElementById('one-tai-type-wrap').style.display = mode === 'type' ? '' : 'none';
+  document.getElementById('one-tai-pick-wrap').style.display = mode === 'pick' ? '' : 'none';
+}
+
+function taiPickButtonsHtml(selected, handler, loserIdx) {
+  return Array.from({ length: TAI_PICK_MAX }, (_, i) => {
+    const n = i + 1;
+    const active = n === selected ? ' active' : '';
+    const click = loserIdx === undefined ? `${handler}(${n})` : `${handler}(${loserIdx}, ${n})`;
+    return `<button type="button" class="tai-btn${active}" onclick="${click}">${n}</button>`;
+  }).join('');
+}
+
+function setTaiInputMode(mode) {
+  if (mode === 'pick') {
+    oneTaiPick = parseInt(document.getElementById('one-tai').value) || 0;
+    syncAllTaiPicksFromInputs();
+  }
+  taiInputMode = mode;
+  applyTaiInputModeUI();
+  if (mode === 'pick') renderOneTaiPick();
+  refreshAllForm();
+}
+
+function syncAllTaiPicksFromInputs() {
+  if (!allWinner || !matchData) return;
+  const losers = matchData.players.filter(p => p !== allWinner);
+  losers.forEach((_, i) => {
+    const inp = document.getElementById(`all-tai-${i}`);
+    if (inp) allTaiPicks[i] = parseInt(inp.value) || 0;
+  });
+}
+
+function getOneTai() {
+  if (taiInputMode === 'pick') return oneTaiPick;
+  return parseInt(document.getElementById('one-tai').value) || 0;
+}
+
+function getAllTai(i) {
+  if (taiInputMode === 'pick') return allTaiPicks[i] ?? 0;
+  return parseInt(document.getElementById(`all-tai-${i}`)?.value) || 0;
+}
+
+function selectOneTai(n) {
+  oneTaiPick = n;
+  document.getElementById('one-tai').value = n;
+  renderOneTaiPick();
+  refreshOnePreview();
+}
+
+function onOneTaiTyped() {
+  oneTaiPick = parseInt(document.getElementById('one-tai').value) || 0;
+  if (taiInputMode === 'pick') renderOneTaiPick();
+  refreshOnePreview();
+}
+
+function renderOneTaiPick() {
+  document.getElementById('one-tai-pick-wrap').innerHTML =
+    taiPickButtonsHtml(oneTaiPick, 'selectOneTai');
+}
+
+function selectAllTai(i, n) {
+  allTaiPicks[i] = n;
+  const inp = document.getElementById(`all-tai-${i}`);
+  if (inp) inp.value = n;
+  refreshAllPreview();
+  if (taiInputMode === 'pick') {
+    const row = document.querySelector(`#all-losers-grid .loser-row[data-idx="${i}"] .tai-pick-row`);
+    if (row) row.innerHTML = taiPickButtonsHtml(n, 'selectAllTai', i);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// View helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Home
+// ─────────────────────────────────────────────────────────────────────────────
+async function goHome() {
+  matchId = null; matchData = null;
+  showView('view-home');
+  await loadHome();
+}
+
+async function loadHome() {
+  const matches = await api('GET', '/api/matches');
+  const el = document.getElementById('home-body');
+
+  if (!matches.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">🎯</div>
+        <h3>No matches yet</h3>
+        <p>Start a new match to begin tracking scores.</p>
+        <button class="btn btn-primary" onclick="openNewMatchModal()">+ New Match</button>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="match-list">${matches.map(m => `
+    <div class="match-item" onclick="openMatch('${m.id}')">
+      <div>
+        <div class="mi-players">${m.players.join(' &middot; ')}</div>
+        <div class="mi-meta">${m.date} &nbsp;·&nbsp; ${m.roundCount} round${m.roundCount !== 1 ? 's' : ''}</div>
+      </div>
+      <span class="badge badge-${m.status}">${m.status}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Match View
+// ─────────────────────────────────────────────────────────────────────────────
+async function openMatch(id) {
+  matchId = id;
+  showView('view-match');
+  await loadMatch();
+}
+
+async function loadMatch() {
+  const data = await api('GET', `/api/matches/${matchId}`);
+  matchData = data;
+
+  const ended = data.status === 'ended';
+  document.getElementById('match-heading').textContent  = data.players.join(' · ');
+  document.getElementById('match-date-badge').textContent = data.date;
+
+  // Header action buttons
+  document.getElementById('match-actions').innerHTML = ended ? '' : `
+    <button class="btn btn-ghost btn-sm" onclick="undoLast()">↩ Undo</button>
+    <button class="btn btn-danger btn-sm" onclick="endMatch()">End Match</button>`;
+
+  document.getElementById('add-round-card').style.display = ended ? 'none' : '';
+
+  renderScoreboard(data);
+  if (!ended) buildRoundForm(data);
+  renderHistory(data);
+}
+
+// ─── Scoreboard ──────────────────────────────────────────────────────────────
+function renderScoreboard(data) {
+  const vals    = Object.values(data.scores);
+  const maxVal  = Math.max(...vals);
+  const allSame = vals.every(v => v === vals[0]);
+
+  document.getElementById('scoreboard').innerHTML = data.players.map(p => {
+    const s       = data.scores[p];
+    const leading = !allSame && s === maxVal;
+    const cls     = s > 0 ? 'col-pos' : s < 0 ? 'col-neg' : 'col-neu';
+    return `<div class="score-card${leading ? ' is-leader' : ''}">
+      <div class="sc-name" title="${p}">${p}</div>
+      <div class="sc-value ${cls}">${s >= 0 ? '+' : ''}${s}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Round Form ──────────────────────────────────────────────────────────────
+function buildRoundForm(data) {
+  const nextRound = data.history.length + 1;
+  document.getElementById('add-round-title').textContent = `Add Round #${nextRound}`;
+
+  oneWinner = data.players[0];
+  oneLoser  = data.players.find(p => p !== oneWinner) || data.players[1];
+  allWinner = data.players[0];
+
+  applyTaiInputModeUI();
+  renderOnePlayerPicks();
+  renderAllWinnerPick();
+  renderOneTaiPick();
+  refreshAllForm();
+  refreshOnePreview();
+}
+
+function setType(t) {
+  roundType = t;
+  document.getElementById('type-one-btn').classList.toggle('active', t === 'ONE');
+  document.getElementById('type-all-btn').classList.toggle('active', t === 'ALL');
+  document.getElementById('form-one').style.display = t === 'ONE' ? '' : 'none';
+  document.getElementById('form-all').style.display = t === 'ALL' ? '' : 'none';
+}
+
+function refreshOnePreview() {
+  const winner = oneWinner;
+  const loser  = oneLoser;
+  const tai    = getOneTai();
+  const pts    = 5 + 2 * tai;
+  document.getElementById('one-preview').innerHTML =
+    `<span style="color:var(--positive);font-weight:600">${winner}</span> wins ` +
+    `<strong style="color:var(--text)">${pts} pts</strong> from ` +
+    `<span style="color:var(--negative);font-weight:600">${loser}</span>` +
+    `<span style="color:var(--text2)"> &nbsp;(5 + 2×${tai})</span>`;
+}
+
+function refreshAllForm() {
+  const winner = allWinner;
+  const losers = matchData.players.filter(p => p !== winner);
+  syncAllTaiPicksFromInputs();
+  while (allTaiPicks.length < losers.length) allTaiPicks.push(0);
+  allTaiPicks = allTaiPicks.slice(0, losers.length);
+
+  const pickMode = taiInputMode === 'pick';
+  document.getElementById('all-losers-grid').innerHTML = losers.map((p, i) => {
+    const taiVal = allTaiPicks[i] ?? 0;
+    const taiTypeHtml = pickMode ? '' : `
+      <div class="lr-tai lr-tai-type">
+        <span class="lr-label">TAI:</span>
+        <input type="number" id="all-tai-${i}" data-idx="${i}" value="${taiVal}" min="0" max="20"
+          oninput="refreshAllPreview()">
+      </div>`;
+    const taiPickHtml = pickMode ? `
+      <div class="lr-tai lr-tai-pick">
+        <div class="tai-pick-row">${taiPickButtonsHtml(allTaiPicks[i], 'selectAllTai', i)}</div>
+      </div>` : '';
+    return `
+    <div class="loser-row" data-idx="${i}">
+      <div class="lr-name">${p}</div>
+      ${taiPickHtml}${taiTypeHtml}
+      <span class="lr-pts" id="all-pts-${i}">−5 pts</span>
+    </div>`;
+  }).join('');
+
+  refreshAllPreview();
+}
+
+function refreshAllPreview() {
+  const winner = allWinner;
+  const losers = matchData.players.filter(p => p !== winner);
+  let total = 0;
+  losers.forEach((p, i) => {
+    const tai = getAllTai(i);
+    const pts = 5 + 2 * tai;
+    total += pts;
+    const el = document.getElementById(`all-pts-${i}`);
+    if (el) el.textContent = `−${pts} pts`;
+  });
+  document.getElementById('all-total').innerHTML =
+    `<span style="color:var(--positive)">${winner}</span> wins <strong>+${total}</strong> pts total`;
+}
+
+// ─── Submit Round ─────────────────────────────────────────────────────────────
+async function submitRound() {
+  let payload = { type: roundType };
+
+  if (roundType === 'ONE') {
+    payload.winner = oneWinner;
+    payload.loser1 = oneLoser;
+    payload.tai1   = getOneTai();
+  } else {
+    payload.winner = allWinner;
+    const losers   = matchData.players.filter(p => p !== payload.winner);
+    losers.forEach((p, i) => {
+      payload[`loser${i + 1}`] = p;
+      payload[`tai${i + 1}`]   = getAllTai(i);
+    });
+  }
+
+  const res = await api('POST', `/api/matches/${matchId}/rounds`, payload);
+  if (res.error) { alert(res.error); return; }
+
+  // Reset TAI inputs
+  oneTaiPick = 0;
+  allTaiPicks = [0, 0, 0];
+  document.getElementById('one-tai').value = 0;
+  if (taiInputMode === 'pick') renderOneTaiPick();
+  await loadMatch();
+}
+
+async function undoLast() {
+  if (!confirm('Undo the last round?')) return;
+  await api('DELETE', `/api/matches/${matchId}/rounds/last`);
+  await loadMatch();
+}
+
+async function endMatch() {
+  if (!confirm('End this match? No more rounds can be added.')) return;
+  await api('POST', `/api/matches/${matchId}/end`);
+  await loadMatch();
+}
+
+// ─── History ─────────────────────────────────────────────────────────────────
+function renderHistory(data) {
+  const { players, history } = data;
+  const el = document.getElementById('history-body');
+
+  if (!history.length) {
+    el.innerHTML = '<p style="color:var(--text2);text-align:center;padding:18px 0">No rounds yet</p>';
+    return;
+  }
+
+  const rev = [...history].reverse();
+
+  // Round Log
+  const logRows = rev.map(r => {
+    let desc = '';
+    if (r.type === 'ONE') {
+      const tai  = parseInt(r.tai1) || 0;
+      const pts  = 5 + 2 * tai;
+      desc = `<span style="color:var(--positive);font-weight:600">${r.winner}</span>`
+           + ` ← <span style="color:var(--negative)">${r.loser1}</span>`
+           + ` <span class="td-mute" style="font-size:0.78em">TAI:${tai} (${pts}pts)</span>`;
+    } else {
+      const parts = [
+        r.loser1 ? `${r.loser1}<span class="td-mute" style="font-size:0.78em">(TAI:${r.tai1})</span>` : null,
+        r.loser2 ? `${r.loser2}<span class="td-mute" style="font-size:0.78em">(TAI:${r.tai2})</span>` : null,
+        r.loser3 ? `${r.loser3}<span class="td-mute" style="font-size:0.78em">(TAI:${r.tai3})</span>` : null,
+      ].filter(Boolean);
+      desc = `<span style="color:var(--positive);font-weight:600">${r.winner}</span>`
+           + ` ← ${parts.join(', ')}`;
+    }
+    const gain = r.pts[r.winner];
+    return `<tr>
+      <td class="td-mute">#${r.round_num}</td>
+      <td><span class="badge badge-${r.type.toLowerCase()}">${r.type}</span></td>
+      <td>${desc}</td>
+      <td class="td-pos">+${gain}</td>
+    </tr>`;
+  }).join('');
+
+  // Running Totals
+  const totalsRows = rev.map(r => {
+    const cells = players.map(p => {
+      const s     = r.after[p];
+      const delta = r.pts[p];
+      const sCls  = s > 0 ? 'td-pos' : s < 0 ? 'td-neg' : 'td-mute';
+      let deltaHtml = '';
+      if (delta !== undefined) {
+        const dCls = delta > 0 ? 'col-pos' : delta < 0 ? 'col-neg' : 'col-neu';
+        deltaHtml  = `<span class="delta ${dCls}">(${delta > 0 ? '+' : ''}${delta})</span>`;
+      }
+      return `<td class="${sCls}">${s >= 0 ? '+' : ''}${s}${deltaHtml}</td>`;
+    }).join('');
+    return `<tr><td class="td-mute">#${r.round_num}</td>${cells}</tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="history-section">
+      <h3>Round Log</h3>
+      <table>
+        <thead><tr><th>#</th><th>Type</th><th>Result</th><th>Winner gain</th></tr></thead>
+        <tbody>${logRows}</tbody>
+      </table>
+    </div>
+    <hr class="divider">
+    <div class="history-section">
+      <h3>Running Totals</h3>
+      <table>
+        <thead><tr><th>#</th>${players.map(p => `<th>${p}</th>`).join('')}</tr></thead>
+        <tbody>${totalsRows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New Match Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function openNewMatchModal() {
+  document.getElementById('new-match-modal').style.display = 'flex';
+  document.getElementById('nm-p1').focus();
+}
+function closeNewMatchModal() {
+  document.getElementById('new-match-modal').style.display = 'none';
+  ['nm-p1','nm-p2','nm-p3','nm-p4'].forEach(id => { document.getElementById(id).value = ''; });
+}
+function handleModalClick(e) {
+  if (e.target === e.currentTarget) closeNewMatchModal();
+}
+
+async function createMatch() {
+  const players = ['nm-p1','nm-p2','nm-p3','nm-p4'].map(id => document.getElementById(id).value.trim());
+  if (players.some(p => !p))        { alert('Please fill in all 4 player names.'); return; }
+  if (players.some(p => p.includes(','))) { alert('Player names cannot contain commas.'); return; }
+  if (new Set(players).size !== 4)  { alert('All player names must be unique.'); return; }
+
+  const res = await api('POST', '/api/matches', { players });
+  if (res.error) { alert(res.error); return; }
+  closeNewMatchModal();
+  openMatch(res.id);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API helper
+// ─────────────────────────────────────────────────────────────────────────────
+async function api(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res  = await fetch(url, opts);
+  return res.json();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Keyboard shortcuts
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeNewMatchModal();
+  if (e.key === 'Enter' && document.getElementById('new-match-modal').style.display !== 'none') {
+    createMatch();
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────────────────────────────────────
+goHome();
+</script>
+</body>
+</html>
