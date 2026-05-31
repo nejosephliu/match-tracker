@@ -126,6 +126,64 @@ function computeScores(players, rounds) {
   return { scores, history };
 }
 
+function computePlayerStats(filterIds) {
+  const statsMap = {};
+
+  function ensurePlayer(key, displayName) {
+    if (!statsMap[key]) {
+      statsMap[key] = {
+        name: displayName,
+        netPoints: 0,
+        oneWins: 0,
+        allWins: 0,
+        oneLosses: 0,
+        allLosses: 0,
+      };
+    }
+    return statsMap[key];
+  }
+
+  const files = fs.readdirSync(MATCHES_DIR).filter(f => f.endsWith('.csv'));
+
+  for (const f of files) {
+    const id = f.replace('.csv', '');
+    if (filterIds && !filterIds.includes(id)) continue;
+
+    const { metaRow, rounds } = parseMatchFile(path.join(MATCHES_DIR, f));
+    const info = metaToInfo(metaRow);
+    const players = [info.p1, info.p2, info.p3, info.p4];
+    const { scores } = computeScores(players, rounds);
+
+    if (rounds.length > 0) {
+      for (const p of players) {
+        const key = p.toLowerCase();
+        ensurePlayer(key, p).netPoints += scores[p];
+      }
+    }
+
+    for (const round of rounds) {
+      const wKey = round.winner.toLowerCase();
+      ensurePlayer(wKey, round.winner);
+
+      if (round.type === 'ONE') {
+        statsMap[wKey].oneWins++;
+        if (round.loser1) {
+          ensurePlayer(round.loser1.toLowerCase(), round.loser1).oneLosses++;
+        }
+      } else if (round.type === 'ALL') {
+        statsMap[wKey].allWins++;
+        for (const loser of [round.loser1, round.loser2, round.loser3]) {
+          if (loser) ensurePlayer(loser.toLowerCase(), loser).allLosses++;
+        }
+      }
+    }
+  }
+
+  return Object.values(statsMap)
+    .filter(p => p.netPoints || p.oneWins || p.allWins || p.oneLosses || p.allLosses)
+    .sort((a, b) => b.netPoints - a.netPoints);
+}
+
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 // GET /api/matches — list all matches
@@ -146,6 +204,18 @@ app.get('/api/matches', (req, res) => {
     });
     matches.sort((a, b) => b.id.localeCompare(a.id));
     res.json(matches);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/stats — cumulative player stats (optional ?ids=id1,id2 filter)
+app.get('/api/stats', (req, res) => {
+  try {
+    const filterIds = req.query.ids
+      ? req.query.ids.split(',').filter(Boolean)
+      : null;
+    res.json({ players: computePlayerStats(filterIds) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -92,13 +92,33 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 15px 18px;
-    display: flex; align-items: center; justify-content: space-between;
-    cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
     transition: border-color 0.15s, background 0.15s;
+  }
+  .match-item.is-selected { border-color: rgba(124,109,250,0.35); }
+  .match-check {
+    display: flex; align-items: center; flex-shrink: 0; cursor: pointer;
+  }
+  .match-check input {
+    width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;
+  }
+  .match-item-body {
+    flex: 1; min-width: 0; cursor: pointer;
   }
   .match-item:hover { border-color: var(--accent); background: var(--card2); }
   .match-item .mi-players { font-weight: 600; color: var(--text); margin-bottom: 3px; }
   .match-item .mi-meta    { font-size: 0.8rem; color: var(--text2); }
+  .filter-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .filter-bar .filter-hint { font-size: 0.8rem; color: var(--text2); }
+  .filter-actions { display: flex; gap: 6px; }
+  .stats-table-wrap { overflow-x: auto; }
+  .stats-table th, .stats-table td { text-align: center; }
+  .stats-table th:first-child, .stats-table td:first-child { text-align: left; }
+  .stats-table .st-name { font-weight: 600; }
+  .stats-empty { color: var(--text2); text-align: center; padding: 20px 0; font-size: 0.9rem; }
   .badge {
     font-size: 0.72rem; font-weight: 700;
     padding: 3px 10px; border-radius: 100px;
@@ -481,6 +501,10 @@ let oneLoser      = null;
 let allWinner     = null;
 let oneTaiPick    = 0;
 let allTaiPicks   = [0, 0, 0];
+let homeMatches   = [];
+let selectedMatchIds = new Set();
+let knownMatchIds = new Set();
+let statsFilterInitialized = false;
 
 const TAI_PICK_MAX = 16;
 
@@ -628,10 +652,10 @@ async function goHome() {
 }
 
 async function loadHome() {
-  const matches = await api('GET', '/api/matches');
+  homeMatches = await api('GET', '/api/matches');
   const el = document.getElementById('home-body');
 
-  if (!matches.length) {
+  if (!homeMatches.length) {
     el.innerHTML = `
       <div class="empty">
         <div class="empty-icon">🎯</div>
@@ -642,15 +666,120 @@ async function loadHome() {
     return;
   }
 
-  el.innerHTML = `<div class="match-list">${matches.map(m => `
-    <div class="match-item" onclick="openMatch('${m.id}')">
-      <div>
-        <div class="mi-players">${m.players.join(' &middot; ')}</div>
+  if (!statsFilterInitialized) {
+    homeMatches.forEach(m => selectedMatchIds.add(m.id));
+    statsFilterInitialized = true;
+  } else {
+    const validIds = new Set(homeMatches.map(m => m.id));
+    for (const id of selectedMatchIds) {
+      if (!validIds.has(id)) selectedMatchIds.delete(id);
+    }
+    for (const m of homeMatches) {
+      if (!knownMatchIds.has(m.id)) selectedMatchIds.add(m.id);
+    }
+  }
+  knownMatchIds = new Set(homeMatches.map(m => m.id));
+
+  await renderHome();
+}
+
+async function loadPlayerStats() {
+  const ids = [...selectedMatchIds];
+  const qs  = ids.length ? `?ids=${ids.map(encodeURIComponent).join(',')}` : '';
+  const res = await api('GET', `/api/stats${qs}`);
+  return res.players || [];
+}
+
+function renderStatsTable(players) {
+  if (!players.length) {
+    return '<p class="stats-empty">No stats for the selected games.</p>';
+  }
+
+  const rows = players.map(p => {
+    const netCls = p.netPoints > 0 ? 'td-pos' : p.netPoints < 0 ? 'td-neg' : 'td-mute';
+    const netStr = `${p.netPoints >= 0 ? '+' : ''}${p.netPoints}`;
+    return `<tr>
+      <td class="st-name">${escHtml(p.name)}</td>
+      <td class="${netCls}">${netStr}</td>
+      <td>${p.allWins}</td>
+      <td>${p.oneWins}</td>
+      <td>${p.allLosses}</td>
+      <td>${p.oneLosses}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="stats-table-wrap">
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Net Pts</th>
+          <th>ALL Wins</th>
+          <th>ONE Wins</th>
+          <th>ALL Losses</th>
+          <th>ONE Losses</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderMatchList() {
+  return homeMatches.map(m => {
+    const checked = selectedMatchIds.has(m.id);
+    return `<div class="match-item${checked ? ' is-selected' : ''}">
+      <label class="match-check" onclick="event.stopPropagation()">
+        <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleMatchSelection('${m.id}', this.checked)">
+      </label>
+      <div class="match-item-body" onclick="openMatch('${m.id}')">
+        <div class="mi-players">${m.players.map(escHtml).join(' &middot; ')}</div>
         <div class="mi-meta">${m.date} &nbsp;·&nbsp; ${m.roundCount} round${m.roundCount !== 1 ? 's' : ''}</div>
       </div>
       <span class="badge badge-${m.status}">${m.status}</span>
-    </div>`).join('')}
-  </div>`;
+    </div>`;
+  }).join('');
+}
+
+async function renderHome() {
+  const el = document.getElementById('home-body');
+  const players = await loadPlayerStats();
+  const selectedCount = selectedMatchIds.size;
+  const totalCount = homeMatches.length;
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Player Stats</span>
+        <span style="font-size:0.78rem;color:var(--text2)">${selectedCount} of ${totalCount} game${totalCount !== 1 ? 's' : ''}</span>
+      </div>
+      ${renderStatsTable(players)}
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Games</span>
+        <div class="filter-actions">
+          <button class="btn btn-ghost btn-sm" onclick="selectAllMatches(true)">All</button>
+          <button class="btn btn-ghost btn-sm" onclick="selectAllMatches(false)">None</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <span class="filter-hint">Check games to include in cumulative stats (players matched case-insensitively)</span>
+      </div>
+      <div class="match-list">${renderMatchList()}</div>
+    </div>`;
+}
+
+async function toggleMatchSelection(id, checked) {
+  if (checked) selectedMatchIds.add(id);
+  else selectedMatchIds.delete(id);
+  await renderHome();
+}
+
+async function selectAllMatches(all) {
+  selectedMatchIds.clear();
+  if (all) homeMatches.forEach(m => selectedMatchIds.add(m.id));
+  await renderHome();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
